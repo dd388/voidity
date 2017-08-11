@@ -92,9 +92,9 @@ def main():
             outfilecsv.writeheader()
 
     if os.path.exists(args.input_dir) and os.path.isdir(args.input_dir):
-        tc = glob(os.path.join(args.input_dir, '*'))
+        tc = [_tc for _tc in glob(os.path.join(args.input_dir, '*')) if not os.path.isdir(_tc)]
     else:
-        sys.exit('error input directory doesn\'t exist or the input directory isn\'t a directory')
+        sys.exit('error: input directory doesn\'t exist or the input directory isn\'t a directory')
 
     for tf in tc:
         tfp = {}
@@ -106,7 +106,7 @@ def main():
             ftype = magic.from_file(tf)
             fmime = magic.from_file(tf, mime=True)
         except:
-            print(ftype)
+            sys.exit('error: unable to run "file" on input: {0}'.format(tf))
 
         if fmime == 'image/png':
             tfp['less than minimum size'] = png_min_size(tf)
@@ -118,9 +118,12 @@ def main():
             tfp['less than minimum size'] = str(jng_min_size(tf))
  
         if ftype.find('image data') != -1:
-            f = Image.open(tf)
-            tfp['less than 100x100'] = image_dimensions(f)
-            tfp['less than three colors'] = image_color(f)
+            try:
+                f = Image.open(tf)
+                tfp['less than 100x100'] = image_dimensions(f)
+                tfp['less than three colors'] = image_color(f)
+            except:
+                pass
 
         elif ftype.find('Microsoft Word') != -1: 
             f = docx.Document(tf)
