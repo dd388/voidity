@@ -4,10 +4,11 @@ import os
 import docx
 import sys
 import magic
-import csv
 from PIL import Image
 from glob import glob
 from argparse import ArgumentParser
+from collections import defaultdict
+import json
 
 fmtstext = ['application/msword',
             'application/pdf',
@@ -26,7 +27,8 @@ fmtsimg =  ['image/bmp',
             'image/jp2',
             'image/jpeg',
             'image/png',
-            'image/tiff'
+            'image/tiff',
+            'image/x-jng'
             ]
 
 fmtsau =   ['application/ogg',
@@ -45,16 +47,19 @@ fmtsvid =  ['video/mp4',
 
 ## GENERAL TESTS ##
 # Size of file
-def size(obj):
-    res = os.stat(obj)
+def _size(obj):
+    try:
+        res = os.stat(obj)
+    except:
+        return None
     if res.st_size > 1000000:
         return False
     else:
         return True
 
+
 ## TEXT TESTS ##
-# Word doc tests
-def word_length(obj):
+def _word_length(obj):
     if len(obj.paragraphs) < 2:
         return True
     else:
@@ -67,8 +72,7 @@ def word_length(obj):
             return False
 
 
-# Plain(ish) text tests
-def text_length(obj):
+def _text_length(obj):
     if len(obj) < 100:
         return True
     else:
@@ -76,43 +80,78 @@ def text_length(obj):
 
 
 ## IMAGE TESTS ##
-# GENERAL
-def image_dimensions(obj):
+def _image_dimensions(obj):
     if (obj.size[0] < 100) or (obj.size[1] < 100):
         return True
     else:
         return False
 
 
-def image_color(obj):
+def _image_color(obj):
     if len(obj.getcolors()) < 3:
         return True
     else:
         return False
 
-## RASTER IMAGE TESTS ##
 
+## IMAGE FORMAT TESTS ##
 #http://git.imagemagick.org/repos/ImageMagick/commit/501b648ee40f804228c76fddc02ca479c75666f3
-def png_min_size(obj):
+def _png_min_size(obj):
     if os.path.getsize(obj) < 61:
         return True
     else:
         return False
 
+
 #http://git.imagemagick.org/repos/ImageMagick/commit/f9574dc71cc1ab8219b3bdfba11bf67dc2d98c71
-def jpeg_min_size(obj):
+def _jpeg_min_size(obj):
     if os.path.getsize(obj) < 107:
         return True
     else:
         return False
 
+
 #http://git.imagemagick.org/repos/ImageMagick/commit/3cc9d45352ebb92947d27c46e2604104b7ebfe90
-def jng_min_size(obj):
+def _jng_min_size(obj):
     if os.path.getsize(obj) < 147:
         return True
     else:
         return False
 
+
+def runtests(filename):
+    results = defaultdict(dict)
+
+    fmime = magic.from_file(filename, mime=True)
+
+    results['general']['less_than_1mb'] = _size(filename)
+
+    if fmime in fmtsimg:
+        try:
+            imgfile = Image.open(filename)
+        except:
+            imgfile = None
+        if fmime == 'image/png':
+            results['images']['png_min_size'] = _png_min_size(filename)
+        if fmime == 'image/jpeg':
+            results['images']['jpeg_min_size'] = _jpeg_min_size(filename)
+        if fmime == 'image/x-jng':
+            results['images']['jng_min_size'] = _jng_min_size(filename) 
+        else:
+            if imgfile:
+                results['images']['less_than_100x100'] = _image_dimensions(imgfile)
+                results['images']['less_than_3_colors'] = _image_color(imgfile)
+            else:
+                results['images']['less_than_100x100'] = None
+                results['images']['less_than_3_colors'] = None
+
+    if fmime in fmtstext:
+        if fmime == 'application/msword':
+            results['text']['length_less_than_100c'] = _word_length(docx.Document(filename))
+        else:
+            results['text']['length_less_than_100c'] = _text_length(open(filename).read())
+ 
+    return results
 
 
 def main():
@@ -125,55 +164,19 @@ def main():
 
     if os.path.isfile(args.output):
         sys.exit('error: output file already exists')
-    else:
-            fieldnames = ['filename', 'less than 1mb', 'less than minimum size', 'less than 100x100', 'less than three colors', 'less than 100 chars']
-            outfile = open(args.output, 'w')
-            outfilecsv = csv.DictWriter(outfile, fieldnames = fieldnames)
-            outfilecsv.writeheader()
 
     if os.path.exists(args.input_dir) and os.path.isdir(args.input_dir):
         tc = [_tc for _tc in glob(os.path.join(args.input_dir, '*')) if not os.path.isdir(_tc)]
     else:
         sys.exit('error: input directory doesn\'t exist or the input directory isn\'t a directory')
 
+    allres = {}
     for tf in tc:
-        tfp = {}
+        allres[tf] = runtests(tf)
 
-        tfp['filename'] = tf
-        tfp['less than 1mb'] = size(tf)
+    with open(args.output, 'w') as output:
+        json.dump(allres, output, indent=4, sort_keys=True) 
 
-        try:
-            ftype = magic.from_file(tf)
-            fmime = magic.from_file(tf, mime=True)
-        except:
-            sys.exit('error: unable to run "file" on input: {0}'.format(tf))
-
-        if fmime == 'image/png':
-            tfp['less than minimum size'] = png_min_size(tf)
-
-        elif fmime == 'image/jpeg':
-            tfp['less than minimum size'] = str(jpeg_min_size(tf))
-
-        elif fmime == 'image/x-jng' or tf.endswith('jng'):
-            tfp['less than minimum size'] = str(jng_min_size(tf))
- 
-        if ftype.find('image data') != -1:
-            try:
-                f = Image.open(tf)
-                tfp['less than 100x100'] = image_dimensions(f)
-                tfp['less than three colors'] = image_color(f)
-            except:
-                pass
-
-        elif ftype.find('Microsoft Word') != -1: 
-            f = docx.Document(tf)
-            tfp['less than 100 chars'] = word_length(f)
-
-        elif ftype == 'ASCII text':
-            f = open(tf).read()
-            tfp['less than 100 chars'] = text_length(f)
-
-        outfilecsv.writerow(tfp)
 
 if __name__ == '__main__':
     main()
