@@ -124,6 +124,7 @@ def runtests(filename):
 
     fmime = magic.from_file(filename, mime=True)
 
+    results['general']['mime_type'] = fmime
     results['general']['less_than_1mb'] = _size(filename)
 
     if fmime in fmtsimg:
