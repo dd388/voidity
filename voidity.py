@@ -132,12 +132,6 @@ def runtests(filename):
             imgfile = Image.open(filename)
         except:
             imgfile = None
-        if fmime == 'image/png':
-            results['images']['png_min_size'] = _png_min_size(filename)
-        if fmime == 'image/jpeg':
-            results['images']['jpeg_min_size'] = _jpeg_min_size(filename)
-        if fmime == 'image/x-jng':
-            results['images']['jng_min_size'] = _jng_min_size(filename) 
         else:
             if imgfile:
                 results['images']['less_than_100x100'] = _image_dimensions(imgfile)
@@ -145,6 +139,15 @@ def runtests(filename):
             else:
                 results['images']['less_than_100x100'] = None
                 results['images']['less_than_3_colors'] = None
+        finally:
+            if fmime == 'image/png':
+                results['images']['under_png_min_size'] = _png_min_size(filename)
+            if fmime == 'image/jpeg':
+                results['images']['under_jpeg_min_size'] = _jpeg_min_size(filename)
+            if fmime == 'image/x-jng':
+                results['images']['under_jng_min_size'] = _jng_min_size(filename) 
+
+
 
     if fmime in fmtstext:
         if fmime == 'application/msword':
