@@ -173,7 +173,7 @@ def main():
 
     allres = {}
     for tf in tc:
-
+        allres[tf] = runtests(tf)
     with open(args.output, 'w') as output:
         json.dump(allres, output, indent=4, sort_keys=True) 
 
