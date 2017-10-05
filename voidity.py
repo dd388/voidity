@@ -118,6 +118,26 @@ def _jng_min_size(obj):
     else:
         return False
 
+#http://git.imagemagick.org/repos/ImageMagick/commit/501b648ee40f804228c76fddc02ca479c75666f3
+def png_min_size(obj):
+    if os.path.getsize(obj) < 61:
+        return True
+    else:
+        return False
+
+#http://git.imagemagick.org/repos/ImageMagick/commit/f9574dc71cc1ab8219b3bdfba11bf67dc2d98c71
+def jpeg_min_size(obj):
+    if os.path.getsize(obj) < 107:
+        return True
+    else:
+        return False
+
+#http://git.imagemagick.org/repos/ImageMagick/commit/3cc9d45352ebb92947d27c46e2604104b7ebfe90
+def jng_min_size(obj):
+    if os.path.getsize(obj) < 147:
+        return True
+    else:
+        return False
 
 def runtests(filename):
     results = defaultdict(dict)
@@ -172,7 +192,6 @@ def main():
 
     allres = {}
     for tf in tc:
-        allres[tf] = runtests(tf)
 
     with open(args.output, 'w') as output:
         json.dump(allres, output, indent=4, sort_keys=True) 
